@@ -13,8 +13,6 @@ bot = Bot(token=config.telegram_token)
 
 dp = Dispatcher(bot)
 
-print("program started")
-
 @dp.message_handler(commands=["start"])
 async def start_command(message: types.Message):
     await message.reply("Привет! Напиши мне название города и я пришлю сводку погоды")
@@ -36,14 +34,14 @@ async def get_weather(message: types.Message):
         humidity = data["main"]["humidity"]
         pressure = data["main"]["pressure"]
         wind = data["wind"]["speed"]
-        # tz = data["timezone"]
         tm =  datetime.timedelta(0 , 10800)
         tp = datetime.timedelta(0 , data["timezone"])
+        delta_time = tm - tp
 
         sunrise_timestamp = datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
         sunset_timestamp = datetime.datetime.fromtimestamp(data["sys"]["sunset"])
-        sunrise = sunrise_timestamp - tm + tp 
-        sunset = sunset_timestamp - tm + tp
+        sunrise = sunrise_timestamp - delta_time
+        sunset = sunset_timestamp - delta_time
 
         # продолжительность дня
         length_of_the_day = datetime.datetime.fromtimestamp(data["sys"]["sunset"]) -       datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
@@ -67,16 +65,17 @@ async def get_weather(message: types.Message):
             # если эмодзи для погоды нет, выводим другое сообщение
             wd = "Посмотри в окно, я не понимаю, что там за погода..."
 
-        zero_datetime = datetime.datetime(1970, 1, 1, 3, 0, 0)
+        zero_datetime = datetime.datetime(1970, 1, 1, 4, 0, 0)
         message_reply = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+            f"{(datetime.datetime.now() - delta_time).strftime('%Y-%m-%d')}\n"
+            f"Локальное время: {(datetime.datetime.now() - delta_time).strftime('%H:%M')}\n"
             f"Погода в городе: {city}\nТемпература: {cur_temp}°C {wd}\n"
             f"Влажность: {humidity}%\nДавление: {math.ceil(pressure/1.333)} мм.рт.ст\nВетер: {wind} м/с \n"
         )
         if sunrise_timestamp > zero_datetime:
             message_reply += (
-                f"Восход солнца: {sunrise}\n"
-                f"Закат солнца: {sunset}\n"
+                f"Восход солнца: {sunrise.time()}\n"
+                f"Закат солнца: {sunset.time()}\n"
                 f"Продолжительность дня: {length_of_the_day}\n"
             )
         message_reply += "Хорошего дня!"
