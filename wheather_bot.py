@@ -31,6 +31,7 @@ async def get_weather(message: types.Message):
         data = response.json()
         city = data["name"]
         cur_temp = data["main"]["temp"]
+        feels_like_temp = data["main"]["feels_like"]
         humidity = data["main"]["humidity"]
         pressure = data["main"]["pressure"]
         wind = data["wind"]["speed"]
@@ -70,6 +71,7 @@ async def get_weather(message: types.Message):
             f"{(datetime.datetime.now() - delta_time).strftime('%Y-%m-%d')}\n"
             f"Локальное время: {(datetime.datetime.now() - delta_time).strftime('%H:%M')}\n"
             f"Погода в городе: {city}\nТемпература: {cur_temp}°C {wd}\n"
+            f"Ощущается как: {round(feels_like_temp)}°C\n"
             f"Влажность: {humidity}%\nДавление: {math.ceil(pressure/1.333)} мм.рт.ст\nВетер: {wind} м/с \n"
         )
         if sunrise_timestamp > zero_datetime:
@@ -85,7 +87,7 @@ async def get_weather(message: types.Message):
         await message.reply("Ошибка при обращении к API погоды. Попробуйте позже.")
         print(f"Error: {e}")
     except KeyError:
-        await message.reply("Получен некорректный ответ от API погоды. Попробуйте позже.")
+        await message.reply("Получен некорректный ответ от API погоды. Попробуйте позже. Возможно достигнут лимит запросов на день.")
         print("Error: Invalid response from weather API.")
     except Exception as e:
         await message.reply("Произошла ошибка. Попробуйте позже.")
