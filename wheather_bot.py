@@ -26,6 +26,7 @@ async def send_startup_message():
 @dp.message_handler()
 async def get_weather(message: types.Message):
     try:
+        dp.register_callback_query_handler(handle_callback_query)
         city = message.text.lower()
         
         response = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q={city}&lang=ru&units=metric&appid={config.weather_api_token}")
@@ -95,13 +96,26 @@ async def get_weather(message: types.Message):
             f"Содержание угарного газа: *{air_pollution_co}*\n"
         )
         message_reply += ("\nХорошего дня!\n")
+        # Добавляем кнопки 
+        # Создаем клавиатуру
+        keyboard = types.InlineKeyboardMarkup(resize_keyboard=True)
+        # Создаем кнопку
+        button_forecast_3h = types.InlineKeyboardButton(text="Прогноз на 3 часа", callback_data=f"forecast3h:{lat}:{lon}")
+        button_forecast_5d = types.InlineKeyboardButton(text="Прогноз на 5 дней", callback_data=f"forecast5d:{lat}:{lon}")
+        # Добавляем кнопку на клавиатуру
+        keyboard.add(button_forecast_3h)
+        keyboard.add(button_forecast_5d)
         
-        message_reply = message_reply.replace('-', r'\-')
-        message_reply = message_reply.replace('.', r'\.')
-        message_reply = message_reply.replace('!', r'\!')
-        message_reply = message_reply.replace('=', r'\=')
-        await message.reply(message_reply, parse_mode='MarkdownV2')
+        message_reply += ("\nХорошего дня!\n")
         
+        message_reply = escape_for_markdown(message_reply)
+
+        await message.reply(message_reply, parse_mode='MarkdownV2', reply_markup=keyboard)
+    
+    except requests.exceptions.HTTPError as error:
+        if response.status_code == 429:
+            await message.reply("Превышен лимит запросов к сайту погоды, восстановится завта")
+        print(f"An HTTP error occurred: {error}")
     except requests.exceptions.RequestException as e:
         await message.reply("Ошибка при обращении к API погоды. Попробуйте позже.")
         print(f"Error: {e}")
@@ -111,6 +125,63 @@ async def get_weather(message: types.Message):
     except Exception as e:
         await message.reply("Произошла ошибка. Попробуйте позже.")
         print(f"Error: {e}")
+
+def escape_for_markdown(message_reply):
+        message_reply = message_reply.replace('-', r'\-')
+        message_reply = message_reply.replace('.', r'\.')
+        message_reply = message_reply.replace('!', r'\!')
+        message_reply = message_reply.replace('=', r'\=')
+        message_reply = message_reply.replace('|', r'\|')
+        message_reply = message_reply.replace('<', r'\<')
+        message_reply = message_reply.replace('>', r'\>')
+        #message_reply = message_reply.replace('`', r'\`')
+        return message_reply
+
+async def handle_callback_query(call: types.CallbackQuery):
+    try:
+        callback_data = call.data.split(':')
+        lat = callback_data[1]
+        lon = callback_data[2]
+        
+        response = requests.get(f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={config.weather_api_token}")
+        data = response.json()
+        if callback_data[0] == "forecast3h":
+            forecast = await forecast_for_3_hours(data)
+            forecast = escape_for_markdown(forecast)
+            await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
+        elif callback_data[0] == "forecast5d":
+            await forecast_for_5_days(data)
+        await bot.answer_callback_query(call.id)
+    except Exception as e:
+        print(f"Error handling query in buttons: {e}")
+
+async def forecast_for_3_hours(data):
+    json_data = data
+    forecast_list = json_data["list"][:3]
+
+    times = [forecast["dt_txt"].split()[1].split(":")[0] + ":00" for forecast in forecast_list]
+    max_time_width = max(len(time) for time in times)
+
+    temperature_values = ["{:>5}".format(round(forecast["main"]["temp"] - 273.15)) for forecast in forecast_list]
+    feels_like_values = ["{:>5}".format(round(forecast["main"]["feels_like"] - 273.15)) for forecast in forecast_list]
+    humidity_values = ["{:>5}".format(forecast["main"]["humidity"]) for forecast in forecast_list]
+    pressure_values = ["{:>5}".format(round(forecast["main"]["pressure"] * 0.75)) for forecast in forecast_list]
+    wind_speed_values = ["{:>5}".format(round(forecast["wind"]["speed"])) for forecast in forecast_list]
+
+    forecast_message = "Прогноз               |3 часа |6 часов\n"
+    forecast_message += "{:<{}} | ".format("Температура °C", max_time_width) + " | ".join(temperature_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Ощущается °C  ", max_time_width) + " | ".join(feels_like_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Влажность %   ", max_time_width) + " | ".join(humidity_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Давление м.р.с", max_time_width) + " | ".join(pressure_values[1:]) + " \n"
+    forecast_message += "{:<{}} | ".format("Ветер   м/с   ", max_time_width) + " | ".join(wind_speed_values[1:]) + "\n"
+
+    # Using f-strings (Python 3.6+)
+    forecast_message = f"```{forecast_message}```"
+
+    return forecast_message
+        
+async def forecast_for_5_days(data):
+        pass
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()

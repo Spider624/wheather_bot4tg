@@ -1,4 +1,7 @@
+/.gitignore
 __pycache__/
-/config.py
 old/
 /to_do.txt
+/config.py
+/request_to_api.py
+/another_bot_telebot.py
