@@ -186,28 +186,26 @@ async def forecast_for_3_hours(data):
     forecast_message = f"```{forecast_message}```"
 
     return forecast_message
-        
+
 async def forecast_for_5_days(data):
     json_data = data
     forecast_list = json_data["list"]
 
-    forecast_message = "Дата     | День | Ночь | Осадки | Погода      \n"
-    forecast_message += "----------------------------------------\n"
+    forecast_message = "Дата      | Ночь  | День  |Осадки\n"
 
     filtered_forecasts = [forecast for forecast in forecast_list if forecast["dt_txt"].split()[1] in ["12:00:00", "03:00:00"]]
 
-    for i in range(len(filtered_forecasts)//2):
-        forecast_day = filtered_forecasts[i * 2]
-        forecast_night = filtered_forecasts[i * 2 + 1]
+    for i in range(0, len(filtered_forecasts), 2):
+        forecast_day = filtered_forecasts[i]
+        forecast_night = filtered_forecasts[i + 1] if i + 1 < len(filtered_forecasts) else None
 
-        date_day = forecast_day["dt_txt"].split()[0]
-        date_night = forecast_night["dt_txt"].split()[0]
+        date = forecast_day["dt_txt"].split()[0]
         day_temp = round(forecast_day["main"]["temp"] - 273.15)
-        night_temp = round(forecast_night["main"]["temp"] - 273.15)
+        night_temp = round(forecast_night["main"]["temp"] - 273.15) if forecast_night else None
         precipitation = round(forecast_day["pop"] * 100)
         weather_description = forecast_day["weather"][0]["main"]
 
-        formatted_date = datetime.datetime.strptime(date_day, "%Y-%m-%d").strftime("%d-%m")
+        formatted_date = datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%d-%m")
 
         code_to_smile = {
             "Clear": "\U00002600",
@@ -221,16 +219,11 @@ async def forecast_for_5_days(data):
 
         emoji = code_to_smile.get(weather_description, "🌡️")
 
-        forecast_message += f"{formatted_date} | {day_temp:>3}°C | {night_temp:>3}°C | {precipitation:>2}% | {emoji:>2}\n"
+        forecast_message += f"{formatted_date} | {day_temp:>3}°C | {night_temp or '-':>3}°C | {precipitation:3}% | {emoji:>1}\n"
 
     forecast_message = f"```{forecast_message}```"
 
     return forecast_message
-
-
-
-
-
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
