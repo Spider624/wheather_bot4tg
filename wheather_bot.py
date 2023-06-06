@@ -23,6 +23,12 @@ async def send_startup_message():
         chat_id = update.message.chat.id
         await bot.send_message(chat_id=chat_id, text="Bot has been started")
         
+def delta_time_f(data_timezone):
+    tm =  datetime.timedelta(0 , 10800)
+    tp = datetime.timedelta(0 , data_timezone)
+    delta_time = tm - tp
+    return delta_time
+        
 @dp.message_handler()
 async def get_weather(message: types.Message):
     try:
@@ -38,9 +44,10 @@ async def get_weather(message: types.Message):
         humidity = data["main"]["humidity"]
         pressure = data["main"]["pressure"]
         wind = data["wind"]["speed"]
-        tm =  datetime.timedelta(0 , 10800)
-        tp = datetime.timedelta(0 , data["timezone"])
-        delta_time = tm - tp
+        # tm =  datetime.timedelta(0 , 10800)
+        # tp = datetime.timedelta(0 , data["timezone"])
+        # delta_time = tm - tp
+        delta_time = delta_time_f(data["timezone"])
 
         sunrise_timestamp = datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
         sunset_timestamp = datetime.datetime.fromtimestamp(data["sys"]["sunset"])
@@ -147,10 +154,10 @@ async def handle_callback_query(call: types.CallbackQuery):
         data = response.json()
         if callback_data[0] == "forecast3h":
             forecast = await forecast_for_3_hours(data)
-            forecast = escape_for_markdown(forecast)
-            await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
         elif callback_data[0] == "forecast5d":
-            await forecast_for_5_days(data)
+            forecast = await forecast_for_5_days(data)
+        forecast = escape_for_markdown(forecast)
+        await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
         await bot.answer_callback_query(call.id)
     except Exception as e:
         print(f"Error handling query in buttons: {e}")
@@ -181,7 +188,49 @@ async def forecast_for_3_hours(data):
     return forecast_message
         
 async def forecast_for_5_days(data):
-        pass
+    json_data = data
+    forecast_list = json_data["list"]
+
+    forecast_message = "Дата     | День | Ночь | Осадки | Погода      \n"
+    forecast_message += "----------------------------------------\n"
+
+    filtered_forecasts = [forecast for forecast in forecast_list if forecast["dt_txt"].split()[1] in ["12:00:00", "03:00:00"]]
+
+    for i in range(len(filtered_forecasts)//2):
+        forecast_day = filtered_forecasts[i * 2]
+        forecast_night = filtered_forecasts[i * 2 + 1]
+
+        date_day = forecast_day["dt_txt"].split()[0]
+        date_night = forecast_night["dt_txt"].split()[0]
+        day_temp = round(forecast_day["main"]["temp"] - 273.15)
+        night_temp = round(forecast_night["main"]["temp"] - 273.15)
+        precipitation = round(forecast_day["pop"] * 100)
+        weather_description = forecast_day["weather"][0]["main"]
+
+        formatted_date = datetime.datetime.strptime(date_day, "%Y-%m-%d").strftime("%d-%m")
+
+        code_to_smile = {
+            "Clear": "\U00002600",
+            "Clouds": "\U00002601",
+            "Rain": "\U00002614",
+            "Drizzle": "\U00002614",
+            "Thunderstorm": "\U000026A1",
+            "Snow": "\U0001F328",
+            "Mist": "\U0001F32B"
+        }
+
+        emoji = code_to_smile.get(weather_description, "🌡️")
+
+        forecast_message += f"{formatted_date} | {day_temp:>3}°C | {night_temp:>3}°C | {precipitation:>2}% | {emoji:>2}\n"
+
+    forecast_message = f"```{forecast_message}```"
+
+    return forecast_message
+
+
+
+
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
