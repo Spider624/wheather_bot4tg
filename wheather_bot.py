@@ -96,7 +96,6 @@ async def get_weather(message: types.Message):
             f"\nИндекс загрязнения воздуха: *{air_pollution_index}*\n _1 = Хорошее, 2 = Удовлетворительное, 3 = Умеренное, 4 = Плохое, 5 = Очень плохое._\n"
             f"Содержание угарного газа: *{air_pollution_co}*\n"
         )
-        message_reply += ("\nХорошего дня!\n")
         # Добавляем кнопки 
         # Создаем клавиатуру
         keyboard = types.InlineKeyboardMarkup(resize_keyboard=True)
