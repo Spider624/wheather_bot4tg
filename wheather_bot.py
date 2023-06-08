@@ -9,6 +9,18 @@ from aiogram.utils import executor
 
 import config
 
+def get_emoji(weather_description):
+    code_to_smile = {
+        "Clear": "\U00002600",
+        "Clouds": "\U00002601",
+        "Rain": "\U00002614",
+        "Drizzle": "\U00002614",
+        "Thunderstorm": "\U000026A1",
+        "Snow": "\U0001F328",
+        "Mist": "\U0001F32B"
+    }
+    return code_to_smile.get(weather_description, "🌡️")
+
 bot = Bot(token=config.telegram_token)
 
 dp = Dispatcher(bot)
@@ -44,9 +56,6 @@ async def get_weather(message: types.Message):
         humidity = data["main"]["humidity"]
         pressure = data["main"]["pressure"]
         wind = data["wind"]["speed"]
-        # tm =  datetime.timedelta(0 , 10800)
-        # tp = datetime.timedelta(0 , data["timezone"])
-        # delta_time = tm - tp
         delta_time = delta_time_f(data["timezone"])
 
         sunrise_timestamp = datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
@@ -66,24 +75,9 @@ async def get_weather(message: types.Message):
         # продолжительность дня
         length_of_the_day = datetime.datetime.fromtimestamp(data["sys"]["sunset"]) -       datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
         
-        code_to_smile = {
-            "Clear": "Ясно \U00002600",
-            "Clouds": "Облачно \U00002601",
-            "Rain": "Дождь \U00002614",
-            "Drizzle": "Дождь \U00002614",
-            "Thunderstorm": "Гроза \U000026A1",
-            "Snow": "Снег \U0001F328",
-            "Mist": "Туман \U0001F32B"
-        }
-        
         # получаем значение погоды
         weather_description = data["weather"][0]["main"]
-
-        if weather_description in code_to_smile:
-            wd = code_to_smile[weather_description]
-        else:
-            # если эмодзи для погоды нет, выводим другое сообщение
-            wd = "Посмотри в окно, я не понимаю, что там за погода..."
+        wd = get_emoji(weather_description)
 
         zero_datetime = datetime.datetime(1970, 1, 1, 4, 0, 0)
         message_reply = (
@@ -168,19 +162,23 @@ async def forecast_for_3_hours(data):
 
     times = [forecast["dt_txt"].split()[1].split(":")[0] + ":00" for forecast in forecast_list]
     max_time_width = max(len(time) for time in times)
-
+    
     temperature_values = ["{:>5}".format(round(forecast["main"]["temp"] - 273.15)) for forecast in forecast_list]
     feels_like_values = ["{:>5}".format(round(forecast["main"]["feels_like"] - 273.15)) for forecast in forecast_list]
     humidity_values = ["{:>5}".format(forecast["main"]["humidity"]) for forecast in forecast_list]
     pressure_values = ["{:>5}".format(round(forecast["main"]["pressure"] * 0.75)) for forecast in forecast_list]
     wind_speed_values = ["{:>5}".format(round(forecast["wind"]["speed"])) for forecast in forecast_list]
-
+    precipitation = ["{:>5}".format(round(round(forecast["pop"] * 100))) for forecast in forecast_list]
+    weather_description = ["{:>5}".format(get_emoji(forecast["weather"][0]["main"])) for forecast in forecast_list]
+    
     forecast_message = "Прогноз               |3 часа |6 часов\n"
     forecast_message += "{:<{}} | ".format("Температура °C", max_time_width) + " | ".join(temperature_values[1:]) + "\n"
-    forecast_message += "{:<{}} | ".format("Ощущается °C  ", max_time_width) + " | ".join(feels_like_values[1:]) + "\n"
-    forecast_message += "{:<{}} | ".format("Влажность %   ", max_time_width) + " | ".join(humidity_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Ощущается   °C", max_time_width) + " | ".join(feels_like_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Влажность    %", max_time_width) + " | ".join(humidity_values[1:]) + "\n"
     forecast_message += "{:<{}} | ".format("Давление м.р.с", max_time_width) + " | ".join(pressure_values[1:]) + " \n"
-    forecast_message += "{:<{}} | ".format("Ветер   м/с   ", max_time_width) + " | ".join(wind_speed_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Ветер      м/с", max_time_width) + " | ".join(wind_speed_values[1:]) + "\n"
+    forecast_message += "{:<{}} | ".format("Осадки       %", max_time_width) + " | ".join(precipitation[1:]) + "\n"
+    forecast_message += "{:<{}}   ".format("Погода         ```", max_time_width) + "```   ```".join(weather_description[1:]) + "``` \n"
 
     forecast_message = f"```{forecast_message}```"
     return forecast_message
@@ -189,60 +187,41 @@ async def forecast_for_5_days(data):
     json_data = data
     forecast_list = json_data["list"]
 
-    forecast_message = "Дата      | День  | Ночь  | Осадки      \n"
+    forecast_message = "        Ночь |  День | Осадки \n"
 
     moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
 
-    # Получение текущего времени в Москве
-    current_datetime = datetime.datetime.now(moscow_timezone)
+    day_forecasts = []
+    night_forecasts = []
 
-    # Определение ближайшего интервала прогноза на 12 часов дня и 3 часа ночи
-    if current_datetime.hour < 12:
-        interval = ("12:00:00", "00:00:00")
-        skip_current_day = False
-    elif current_datetime.hour < 15:
-        interval = ("15:00:00", "03:00:00")
-        skip_current_day = False
-    else:
-        interval = ("12:00:00", "03:00:00")
-        skip_current_day = True
+    for forecast in forecast_list:
+        forecast_time = forecast["dt_txt"].split()[1]
+        if forecast_time == "15:00:00":
+            day_forecasts.append(forecast)
+        elif forecast_time == "06:00:00":
+            night_forecasts.append(forecast)
 
-    filtered_forecasts = [forecast for forecast in forecast_list if forecast["dt_txt"].split()[1] in interval]
-
-    # Пропуск текущего дня, если необходимо
-    if skip_current_day:
-        filtered_forecasts = filtered_forecasts[1:]
-
-    for i in range(0, len(filtered_forecasts), 2):
-        forecast_day = filtered_forecasts[i]
-        forecast_night = filtered_forecasts[i + 1] if i + 1 < len(filtered_forecasts) else None
+    for i in range(min(len(day_forecasts), len(night_forecasts))):
+        forecast_day = day_forecasts[i]
+        forecast_night = night_forecasts[i]
 
         date_str = forecast_day["dt_txt"].split()[0]
-        time_str = forecast_day["dt_txt"].split()[1]
-
-        forecast_datetime = datetime.datetime.strptime(date_str + " " + time_str, "%Y-%m-%d %H:%M:%S")
+        forecast_datetime = datetime.datetime.strptime(date_str + " 12:00:00", "%Y-%m-%d %H:%M:%S")
         forecast_datetime = forecast_datetime.replace(tzinfo=moscow_timezone)
 
         formatted_date = forecast_datetime.strftime("%d-%m")
         day_temp = round(forecast_day["main"]["temp"] - 273.15)
-        night_temp = round(forecast_night["main"]["temp"] - 273.15) if forecast_night else None
+        night_temp = round(forecast_night["main"]["temp"] - 273.15)
         precipitation = round(forecast_day["pop"] * 100)
         weather_description = forecast_day["weather"][0]["main"]
 
-        code_to_smile = {
-            "Clear": "\U00002600",
-            "Clouds": "\U00002601",
-            "Rain": "\U00002614",
-            "Drizzle": "\U00002614",
-            "Thunderstorm": "\U000026A1",
-            "Snow": "\U0001F328",
-            "Mist": "\U0001F32B"
-        }
+        if night_temp < day_temp:
+            day_temp, night_temp = night_temp, day_temp
 
-        emoji = code_to_smile.get(weather_description, "🌡️")
+        emoji = get_emoji(weather_description)
 
-        forecast_message += f"{formatted_date} | {day_temp:>3}°C | {night_temp or '-':>3}°C | {precipitation:>3}% | {emoji:>2}\n"
-    forecast_message = f"```{forecast_message}```"
+        forecast_message += f"{formatted_date}| {day_temp:>4}°C| {night_temp:>4}°C| {precipitation:>3}%| ```{emoji:>0}``` \n"
+    forecast_message = f"```\n{forecast_message}```"
     return forecast_message
 
 if __name__ == "__main__":
