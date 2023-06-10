@@ -185,42 +185,30 @@ async def forecast_for_3_hours(data):
 async def forecast_for_5_days(data):
     json_data = data
     forecast_list = json_data["list"]
+    
+    forecast_message = "Дата     |  Макс |   Мин | Осадки \n"
 
-    forecast_message = "        Ночь |  День | Осадки \n"
-
-    moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
-
-    day_forecasts = []
-    night_forecasts = []
+    day_forecasts = {}
 
     for forecast in forecast_list:
-        forecast_time = forecast["dt_txt"].split()[1]
-        if forecast_time == "15:00:00":
-            day_forecasts.append(forecast)
-        elif forecast_time == "06:00:00":
-            night_forecasts.append(forecast)
+        forecast_date = forecast["dt_txt"].split()[0]
+        if forecast_date not in day_forecasts:
+            day_forecasts[forecast_date] = []
+        day_forecasts[forecast_date].append(forecast)
 
-    for i in range(min(len(day_forecasts), len(night_forecasts))):
-        forecast_day = day_forecasts[i]
-        forecast_night = night_forecasts[i]
-
-        date_str = forecast_day["dt_txt"].split()[0]
-        forecast_datetime = datetime.datetime.strptime(date_str + " 12:00:00", "%Y-%m-%d %H:%M:%S")
-        forecast_datetime = forecast_datetime.replace(tzinfo=moscow_timezone)
-
-        formatted_date = forecast_datetime.strftime("%d-%m")
-        day_temp = round(forecast_day["main"]["temp"] - 273.15)
-        night_temp = round(forecast_night["main"]["temp"] - 273.15)
-        precipitation = round(forecast_day["pop"] * 100)
-        weather_description = forecast_day["weather"][0]["main"]
-
-        if night_temp < day_temp:
-            day_temp, night_temp = night_temp, day_temp
+    for date, forecasts in day_forecasts.items():
+        temps = [forecast["main"]["temp"] - 273.15 for forecast in forecasts]
+        min_temp = round(min(temps))
+        max_temp = round(max(temps))
+        precipitation = round(forecasts[0]["pop"] * 100)
+        weather_description = forecasts[0]["weather"][0]["main"]
 
         emoji = get_emoji(weather_description)
 
-        forecast_message += f"{formatted_date}| {day_temp:>4}°C| {night_temp:>4}°C| {precipitation:>3}%| ```{emoji:>0}``` \n"
-    forecast_message = f"```\n{forecast_message}```"
+        formatted_date = datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%d-%m")
+        forecast_message += f"{formatted_date}| {max_temp:>4}°C| {min_temp:>4}°C| {precipitation:>3}%| ```{emoji:>0}``` \n"
+
+    forecast_message = f"```{forecast_message}```"
     return forecast_message
 
 if __name__ == "__main__":
