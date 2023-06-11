@@ -5,3 +5,7 @@ old/
 /config.py
 /request_to_api.py
 /another_bot_telebot.py
+bot/
+data/
+/main.py
+.vscode/

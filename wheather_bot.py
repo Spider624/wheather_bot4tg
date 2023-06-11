@@ -1,4 +1,3 @@
-import os
 import datetime
 import requests
 import asyncio
@@ -7,6 +6,7 @@ from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor 
 
+import  texts
 import config
 
 def get_emoji(weather_description):
@@ -21,25 +21,42 @@ def get_emoji(weather_description):
     }
     return code_to_smile.get(weather_description, "🌡️")
 
+
+def escape_for_markdown(message_reply):
+        message_reply = message_reply.replace('-', r'\-')
+        message_reply = message_reply.replace('.', r'\.')
+        message_reply = message_reply.replace('!', r'\!')
+        message_reply = message_reply.replace('=', r'\=')
+        message_reply = message_reply.replace('|', r'\|')
+        message_reply = message_reply.replace('<', r'\<')
+        message_reply = message_reply.replace('>', r'\>')
+        message_reply = message_reply.replace('(', '\[').replace(')', '\]')
+        #message_reply = message_reply.replace('`', r'\`')
+        return message_reply
+
 bot = Bot(token=config.telegram_token)
 
 dp = Dispatcher(bot)
 
+
 @dp.message_handler(commands=["start"])
 async def start_command(message: types.Message):
     await message.reply("Привет! Напиши мне название города и я пришлю сводку погоды")
+
 
 async def send_startup_message():
     updates = await bot.get_updates()
     for update in updates:
         chat_id = update.message.chat.id
         await bot.send_message(chat_id=chat_id, text="Bot has been started")
-        
+
+    
 def delta_time_f(data_timezone):
     tm =  datetime.timedelta(0 , 10800)
     tp = datetime.timedelta(0 , data_timezone)
     delta_time = tm - tp
     return delta_time
+ 
         
 @dp.message_handler()
 async def get_weather(message: types.Message):
@@ -65,12 +82,12 @@ async def get_weather(message: types.Message):
         
         lat = data["coord"]["lat"]
         lon = data["coord"]["lon"]
-        response_pollution = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={config.weather_api_token}")
-        data_pollution = response_pollution.json()
+        # response_pollution = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={config.weather_api_token}")
+        # data_pollution = response_pollution.json()
         
-        #Air Quality Index. Possible values: 1, 2, 3, 4, 5. Where 1 = Good, 2 = Fair, 3 = Moderate, 4 = Poor, 5 = Very Poor.
-        air_pollution_index = data_pollution["list"][0]["main"]["aqi"]
-        air_pollution_co = data_pollution["list"][0]["components"]["co"]
+        # #Air Quality Index. Possible values: 1, 2, 3, 4, 5. Where 1 = Good, 2 = Fair, 3 = Moderate, 4 = Poor, 5 = Very Poor.
+        # air_pollution_index = data_pollution["list"][0]["main"]["aqi"]
+        # air_pollution_co = data_pollution["list"][0]["components"]["co"]
 
         # продолжительность дня
         length_of_the_day = datetime.datetime.fromtimestamp(data["sys"]["sunset"]) -       datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
@@ -92,17 +109,16 @@ async def get_weather(message: types.Message):
                 f"Закат солнца: {sunset.time()}\n"
                 f"Продолжительность дня: {length_of_the_day}\n"
             )
-        message_reply += (
-            f"\nИндекс загрязнения воздуха: *{air_pollution_index}*\n _1 = Хорошее, 2 = Удовлетворительное, 3 = Умеренное, 4 = Плохое, 5 = Очень плохое._\n"
-            f"Содержание угарного газа: *{air_pollution_co}*\n"
-        )
+
         # Добавляем кнопки 
         # Создаем клавиатуру
         keyboard = types.InlineKeyboardMarkup(resize_keyboard=True)
         # Создаем кнопку
+        button_air_quality = types.InlineKeyboardButton(text="Качество воздуха", callback_data=f"air_quality:{lat}:{lon}")
         button_forecast_3h = types.InlineKeyboardButton(text="Прогноз на 3 часа", callback_data=f"forecast3h:{lat}:{lon}")
         button_forecast_5d = types.InlineKeyboardButton(text="Прогноз на 5 дней", callback_data=f"forecast5d:{lat}:{lon}")
         # Добавляем кнопку на клавиатуру
+        keyboard.add(button_air_quality)
         keyboard.add(button_forecast_3h)
         keyboard.add(button_forecast_5d)
         
@@ -126,16 +142,6 @@ async def get_weather(message: types.Message):
         await message.reply("Произошла ошибка. Попробуйте позже.")
         print(f"Error: {e}")
 
-def escape_for_markdown(message_reply):
-        message_reply = message_reply.replace('-', r'\-')
-        message_reply = message_reply.replace('.', r'\.')
-        message_reply = message_reply.replace('!', r'\!')
-        message_reply = message_reply.replace('=', r'\=')
-        message_reply = message_reply.replace('|', r'\|')
-        message_reply = message_reply.replace('<', r'\<')
-        message_reply = message_reply.replace('>', r'\>')
-        #message_reply = message_reply.replace('`', r'\`')
-        return message_reply
 
 async def handle_callback_query(call: types.CallbackQuery):
     try:
@@ -143,17 +149,147 @@ async def handle_callback_query(call: types.CallbackQuery):
         lat = callback_data[1]
         lon = callback_data[2]
         
-        response = requests.get(f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={config.weather_api_token}")
-        data = response.json()
-        if callback_data[0] == "forecast3h":
-            forecast = await forecast_for_3_hours(data)
-        elif callback_data[0] == "forecast5d":
-            forecast = await forecast_for_5_days(data)
-        forecast = escape_for_markdown(forecast)
-        await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
-        await bot.answer_callback_query(call.id)
+        if callback_data[0] == "air_quality":
+            response_pollution = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={config.weather_api_token}")
+            data_pollution = response_pollution.json()
+            forecast = await get_air_quality(call, data_pollution)
+        else:
+            response = requests.get(f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={config.weather_api_token}")
+            data = response.json()
+            if callback_data[0] == "forecast3h":
+                forecast = await forecast_for_3_hours(data)
+            elif callback_data[0] == "forecast5d":
+                forecast = await forecast_for_5_days(data) 
+            forecast = escape_for_markdown(forecast)
+            await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
+            await bot.answer_callback_query(call.id)
     except Exception as e:
         print(f"Error handling query in buttons: {e}")
+
+
+@dp.callback_query_handler(lambda c: c.data == 'air_quality_comment_short')
+async def air_quality_comment_handler(callback_query: types.CallbackQuery):
+    air_quality_comment_short = texts.air_quality_comment_short
+
+    air_quality_comment_short = escape_for_markdown(air_quality_comment_short)
+    # Отправляем комментарий в ответ на нажатие кнопки
+    await bot.send_message(chat_id=callback_query.message.chat.id, text=air_quality_comment_short, parse_mode='MarkdownV2')
+ 
+    
+@dp.callback_query_handler(lambda c: c.data == 'air_quality_comment_full')
+async def air_quality_comment_handler(callback_query: types.CallbackQuery):
+  
+    air_quality_comment_full = texts.air_quality_comment_full 
+    
+    # Отправляем комментарий в ответ на нажатие кнопки
+    air_quality_comment_full = escape_for_markdown(air_quality_comment_full)
+    await bot.send_message(chat_id=callback_query.message.chat.id, text=air_quality_comment_full, parse_mode='MarkdownV2')
+
+
+@dp.message_handler(commands=['air_quality'])
+async def get_air_quality(call: types.CallbackQuery, data):
+    air_quality_comment = await air_quality_status(data)
+    air_quality_comment = escape_for_markdown(air_quality_comment)
+    inline_keyboard = types.InlineKeyboardMarkup()
+    comment_button_short = types.InlineKeyboardButton("Кратко о веществах", callback_data="air_quality_comment_short")
+    comment_button_full = types.InlineKeyboardButton("Подробно о веществах", callback_data="air_quality_comment_full")
+    inline_keyboard.add(comment_button_short)
+    inline_keyboard.add(comment_button_full)
+    # Отправляем сообщение с результатами и кнопкой
+    await bot.send_message(chat_id=call.message.chat.id, text=air_quality_comment, reply_markup=inline_keyboard, parse_mode='MarkdownV2')
+
+
+async def air_quality_status(data):
+    
+    air_pollution_index = data["list"][0]["main"]["aqi"]
+    air_pollution_co = data["list"][0]["components"]["co"]
+    air_pollution_no = data["list"][0]["components"]["no"]
+    air_pollution_no2 = data["list"][0]["components"]["no2"]
+    air_pollution_o3 = data["list"][0]["components"]["o3"]
+    air_pollution_so2 = data["list"][0]["components"]["so2"]
+    air_pollution_pm2_5 = data["list"][0]["components"]["pm2_5"]
+    air_pollution_pm10 = data["list"][0]["components"]["pm10"]
+    air_pollution_nh3 = data["list"][0]["components"]["nh3"]
+
+    aqi_levels = {
+        "Хорошее": {
+            "Index": 1,
+            "SO2": [0.0, 20.0],
+            "NO2": [0.0, 40.0],
+            "PM10": [0.0, 20.0],
+            "PM2.5": [0.0, 10.0],
+            "O3": [0.0, 60.0],
+            "CO": [0.0, 4400.0]
+        },
+        "Нормальное": {
+            "Index": 2,
+            "SO2": [20.0, 80.0],
+            "NO2": [40.0, 70.0],
+            "PM10": [20.0, 50.0],
+            "PM2.5": [10.0, 25.0],
+            "O3": [60.0, 100.0],
+            "CO": [4400.0, 9400.0]
+        },
+        "_Среднее_": {
+            "Index": 3,
+            "SO2": [80.0, 250.0],
+            "NO2": [70.0, 150.0],
+            "PM10": [50.0, 100.0],
+            "PM2.5": [25.0, 50.0],
+            "O3": [100.0, 140.0],
+            "CO": [9400.0, 12400.0]
+        },
+        "*Плохое*": {
+            "Index": 4,
+            "SO2": [250.0, 350.0],
+            "NO2": [150.0, 200.0],
+            "PM10": [100.0, 200.0],
+            "PM2.5": [50.0, 75.0],
+            "O3": [140.0, 180.0],
+            "CO": [12400.0, 15400.0]
+        },
+        "*Очень плохое !!!*": {
+            "Index": 5,
+            "SO2": [350.0, float("inf")],
+            "NO2": [200.0, float("inf")],
+            "PM10": [200.0, float("inf")],
+            "PM2.5": [75.0, float("inf")],
+            "O3": [180.0, float("inf")],
+            "CO": [15400.0, float("inf")]
+        }
+    }
+    
+    air_quality_categories = {}
+    #formatting first
+    f = "`"
+    for parameter, value in {
+        "SO2": air_pollution_so2,
+        "NO2": air_pollution_no2,
+        "PM10": air_pollution_pm10,
+        "PM2.5": air_pollution_pm2_5,
+        "O3": air_pollution_o3,
+        "CO": air_pollution_co
+    }.items():
+        for category, thresholds in aqi_levels.items():
+            if thresholds[parameter][0] <= value <= thresholds[parameter][1]:
+                air_quality_categories[parameter] = category
+                break
+    air_quality_index_label = ["Unknown", "Хорошее", "Нормальное", "_Среднее_", "Плохое", "Очень плохое"]
+    air_quality_message = f"""Текущее Качество воздуха:
+{f}Air Quality Index:{f} *\n        {air_pollution_index} ({air_quality_index_label[air_pollution_index]})*
+Концентрация:
+{f}CO    :{f} {air_pollution_co} ({air_quality_categories.get("CO")})
+{f}NO2   :{f} {air_pollution_no2}   ({air_quality_categories.get("NO2")})
+{f}O3    :{f} {air_pollution_o3} ({air_quality_categories.get("O3")})
+{f}SO2   :{f} {air_pollution_so2}   ({air_quality_categories.get("SO2")})
+{f}PM2,5 :{f} {air_pollution_pm2_5}  ({air_quality_categories.get("PM2.5")})
+{f}PM10  :{f} {air_pollution_pm10} ({air_quality_categories.get("PM10")})
+Не влияют на качество воздуха:
+{f}NO    :{f} {air_pollution_no}
+{f}NH3   :{f} {air_pollution_nh3}"""
+
+    return air_quality_message
+
 
 async def forecast_for_3_hours(data):
     json_data = data
@@ -181,6 +317,7 @@ async def forecast_for_3_hours(data):
 
     forecast_message = f"```{forecast_message}```"
     return forecast_message
+
 
 async def forecast_for_5_days(data):
     json_data = data
@@ -210,6 +347,7 @@ async def forecast_for_5_days(data):
 
     forecast_message = f"```{forecast_message}```"
     return forecast_message
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
