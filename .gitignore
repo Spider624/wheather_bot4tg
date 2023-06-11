@@ -9,3 +9,7 @@ bot/
 data/
 /main.py
 .vscode/
+/tg_wheather_bot.service
+/auto_update.sh
+/get-pip.py
+/restart_bot_service.sh
