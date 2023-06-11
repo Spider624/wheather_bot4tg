@@ -82,12 +82,6 @@ async def get_weather(message: types.Message):
         
         lat = data["coord"]["lat"]
         lon = data["coord"]["lon"]
-        # response_pollution = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={config.weather_api_token}")
-        # data_pollution = response_pollution.json()
-        
-        # #Air Quality Index. Possible values: 1, 2, 3, 4, 5. Where 1 = Good, 2 = Fair, 3 = Moderate, 4 = Poor, 5 = Very Poor.
-        # air_pollution_index = data_pollution["list"][0]["main"]["aqi"]
-        # air_pollution_co = data_pollution["list"][0]["components"]["co"]
 
         # продолжительность дня
         length_of_the_day = datetime.datetime.fromtimestamp(data["sys"]["sunset"]) -       datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
