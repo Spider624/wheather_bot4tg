@@ -13,3 +13,4 @@ data/
 /auto_update.sh
 /get-pip.py
 /restart_bot_service.sh
+git_logfile.log
