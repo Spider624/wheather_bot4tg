@@ -111,10 +111,12 @@ async def get_weather(message: types.Message):
         button_air_quality = types.InlineKeyboardButton(text="Качество воздуха", callback_data=f"air_quality:{lat}:{lon}")
         button_forecast_3h = types.InlineKeyboardButton(text="Прогноз на 3 часа", callback_data=f"forecast3h:{lat}:{lon}")
         button_forecast_5d = types.InlineKeyboardButton(text="Прогноз на 5 дней", callback_data=f"forecast5d:{lat}:{lon}")
+        button_marine_weather = types.InlineKeyboardButton(text="Температура воды", callback_data=f"marine_weather:{lat}:{lon}")
         # Добавляем кнопку на клавиатуру
         keyboard.add(button_air_quality)
         keyboard.add(button_forecast_3h)
         keyboard.add(button_forecast_5d)
+        keyboard.add(button_marine_weather)
         
         message_reply += ("\nХорошего дня!\n")
         
@@ -147,6 +149,10 @@ async def handle_callback_query(call: types.CallbackQuery):
             response_pollution = requests.get(f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={config.weather_api_token}")
             data_pollution = response_pollution.json()
             forecast = await get_air_quality(call, data_pollution)
+        elif callback_data[0] == "marine_weather":
+            response_water = requests.get(f"http://api.weatherapi.com/v1/marine.json?key={config.marine_wheather_api_token}&q={lat},{lon}")
+            data_water = response_water.json()
+            forecast = await get_marine_temp(data_water)
         else:
             response = requests.get(f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={config.weather_api_token}")
             data = response.json()
@@ -154,9 +160,9 @@ async def handle_callback_query(call: types.CallbackQuery):
                 forecast = await forecast_for_3_hours(data)
             elif callback_data[0] == "forecast5d":
                 forecast = await forecast_for_5_days(data) 
-            forecast = escape_for_markdown(forecast)
-            await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
-            await bot.answer_callback_query(call.id)
+        forecast = escape_for_markdown(forecast)
+        await bot.send_message(chat_id=call.message.chat.id, text=forecast, parse_mode='MarkdownV2')
+        await bot.answer_callback_query(call.id)
     except Exception as e:
         print(f"Error handling query in buttons: {e}")
 
@@ -284,6 +290,17 @@ async def air_quality_status(data):
 
     return air_quality_message
 
+
+async def get_marine_temp(json_data):
+    data = json_data
+    forecastday = data["forecast"]["forecastday"][0]
+    water_temp_list = [hour["water_temp_c"] for hour in forecastday["hour"]]
+    
+    max_water_temp = max(water_temp_list)
+    min_water_temp = min(water_temp_list)
+    water_message = f"t° Температура воды сегодня\n MAX:   {max_water_temp}°C\n MIN:   {min_water_temp}°C\n"
+    water_message = f"```{water_message}```"
+    return water_message
 
 async def forecast_for_3_hours(data):
     json_data = data

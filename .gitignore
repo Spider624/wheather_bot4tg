@@ -14,3 +14,4 @@ data/
 /get-pip.py
 /restart_bot_service.sh
 git_logfile.log
+output.txt
