@@ -1,5 +1,6 @@
 /.gitignore
 __pycache__/
+venv/
 old/
 /to_do.txt
 /config.py
