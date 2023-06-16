@@ -8,6 +8,7 @@ data/
 .vscode/
 venv
 .idea
+wheather_bot0/
 
 #files
 git_logfile.log
