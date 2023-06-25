@@ -106,17 +106,15 @@ async def get_weather(message: types.Message):
 
         # Добавляем кнопки 
         # Создаем клавиатуру
-        keyboard = types.InlineKeyboardMarkup(resize_keyboard=True)
+        keyboard = types.InlineKeyboardMarkup(resize_keyboard=True, row_width=2)
         # Создаем кнопку
         button_air_quality = types.InlineKeyboardButton(text="Качество воздуха", callback_data=f"air_quality:{lat}:{lon}")
         button_forecast_3h = types.InlineKeyboardButton(text="Прогноз на 3 часа", callback_data=f"forecast3h:{lat}:{lon}")
         button_forecast_5d = types.InlineKeyboardButton(text="Прогноз на 5 дней", callback_data=f"forecast5d:{lat}:{lon}")
         button_marine_weather = types.InlineKeyboardButton(text="Температура воды", callback_data=f"marine_weather:{lat}:{lon}")
         # Добавляем кнопку на клавиатуру
-        keyboard.add(button_air_quality)
-        keyboard.add(button_forecast_3h)
-        keyboard.add(button_forecast_5d)
-        keyboard.add(button_marine_weather)
+        keyboard.add(button_forecast_3h, button_forecast_5d)
+        keyboard.add(button_air_quality, button_marine_weather)
         
         message_reply += ("\nХорошего дня!\n")
         
