@@ -5,6 +5,9 @@ import math
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor 
+from aiogram.types.message import ContentType
+from aiogram.utils.markdown import text, bold, italic, code, pre
+from aiogram.types import ParseMode, InputMediaPhoto, InputMediaVideo, ChatActions
 
 import  texts
 import config
@@ -292,10 +295,14 @@ async def air_quality_status(data):
 async def get_marine_temp(json_data):
     data = json_data
     forecastday = data["forecast"]["forecastday"][0]
-    water_temp_list = [hour["water_temp_c"] for hour in forecastday["hour"]]
+    # для платного плана (хотя это и извращение немного)
+    # water_temp_list = [hour["water_temp_c"] for hour in forecastday["hour"]]
+    # max_water_temp = max(water_temp_list)
+    # min_water_temp = min(water_temp_list)
     
-    max_water_temp = max(water_temp_list)
-    min_water_temp = min(water_temp_list)
+    # для бесплатного плана - без часов, только макс и мин
+    max_water_temp = forecastday['day']['maxtemp_c']
+    min_water_temp = forecastday['day']['mintemp_c']
     water_message = f"t° Температура воды сегодня\n MAX:   {max_water_temp}°C\n MIN:   {min_water_temp}°C\n"
     water_message = f"```{water_message}```"
     return water_message
@@ -357,6 +364,16 @@ async def forecast_for_5_days(data):
     forecast_message = f"```{forecast_message}```"
     return forecast_message
 
+@dp.message_handler(commands=['help'])
+async def process_help_command(message: types.Message):
+    await message.reply("для получения помощи свяжитесь с командой поддержки бота")
+
+@dp.message_handler(content_types=ContentType.ANY)
+async def unknown_message(msg: types.Message):
+    message_text = text(('Я не знаю, что с этим делать'),
+                        italic('\nЯ просто напомню,'), 'что есть',
+                        code('команда'), '/help')
+    await msg.reply(message_text, parse_mode=ParseMode.MARKDOWN)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
