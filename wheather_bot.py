@@ -293,19 +293,23 @@ async def air_quality_status(data):
 
 
 async def get_marine_temp(json_data):
-    data = json_data
-    forecastday = data["forecast"]["forecastday"][0]
-    # для платного плана (хотя это и извращение немного)
-    # water_temp_list = [hour["water_temp_c"] for hour in forecastday["hour"]]
-    # max_water_temp = max(water_temp_list)
-    # min_water_temp = min(water_temp_list)
-    
-    # для бесплатного плана - без часов, только макс и мин
-    max_water_temp = forecastday['day']['maxtemp_c']
-    min_water_temp = forecastday['day']['mintemp_c']
-    water_message = f"t° Температура воды сегодня\n MAX:   {max_water_temp}°C\n MIN:   {min_water_temp}°C\n"
-    water_message = f"```{water_message}```"
-    return water_message
+    try:
+        data = json_data
+        forecastday = data["forecast"]["forecastday"][0]
+        # для платного плана (хотя это и извращение немного)
+        # water_temp_list = [hour["water_temp_c"] for hour in forecastday["hour"]]
+        # max_water_temp = max(water_temp_list)
+        # min_water_temp = min(water_temp_list)
+        
+        # для бесплатного плана - без часов, только макс и мин
+        max_water_temp = forecastday['day']['maxtemp_c']
+        min_water_temp = forecastday['day']['mintemp_c']
+        water_message = f"t° Температура воды сегодня\n MAX:   {max_water_temp}°C\n MIN:   {min_water_temp}°C\n"
+        water_message = f"```{water_message}```"
+        return water_message
+    except Exception as e:
+        print(f"Error to recieve water temp {e}")
+        return f"По даному городу нет данных о температуре воды"
 
 async def forecast_for_3_hours(data):
     json_data = data
