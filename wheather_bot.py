@@ -154,6 +154,9 @@ async def handle_callback_query(call: types.CallbackQuery):
             response_water = requests.get(f"http://api.weatherapi.com/v1/marine.json?key={config.marine_wheather_api_token}&q={lat},{lon}")
             data_water = response_water.json()
             forecast = await get_marine_temp(data_water)
+        # функция извлечения данных с местоположения (валюта, индекс и прочее), не работает, тк пока только по ip а не по координатам
+        # elif callback_data[0] == "ip_geo_info":
+        #     response_geo = requests.get(f"https://api.ipgeolocation.io/ipgeo?apiKey={config.ip_geolocation_token}&lat={lat}&lon={lon}")
         else:
             response = requests.get(f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={config.weather_api_token}")
             data = response.json()
